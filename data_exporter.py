@@ -119,7 +119,18 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
             0
         )
         reg_action(action_desc)
-        
+
+        # 导出指令后1字节
+        action_desc = ida_kernwin.action_desc_t(
+            "data_exporter:export_insn_last1",
+            "导出指令后1字节",
+            ExportInsnLastBytesAction(self),
+            None,
+            "导出每条指令机器码的最后1字节",
+            0
+        )
+        reg_action(action_desc)
+
         # 导出指令后4字节
         action_desc = ida_kernwin.action_desc_t(
             "data_exporter:export_insn_last4",
@@ -250,7 +261,7 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
             if len(line_data) == 16 or i == size - 1:
                 addr = ea - len(line_data) + 1
                 # print(f"0x{addr:08X}: {', '.join(line_data)}")
-                print(f"{', '.join(line_data)}")
+                print(f"{', '.join(line_data)},")
                 line_data = []
         
         # print(f"{'-' * 80}")
@@ -293,7 +304,7 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
             if len(line_data) == 8 or i == word_count - 1:
                 addr = ea - len(line_data) * 2 + 2
                 # print(f"0x{addr:08X}: {', '.join(line_data)}")
-                print(f"{', '.join(line_data)}")
+                print(f"{', '.join(line_data)},")
                 line_data = []
         
         # print(f"{'-' * 80}")
@@ -338,7 +349,7 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
             if len(line_data) == 4 or i == dword_count - 1:
                 addr = ea - len(line_data) * 4 + 4
                 # print(f"0x{addr:08X}: {', '.join(line_data)}")
-                print(f"{', '.join(line_data)}")
+                print(f"{', '.join(line_data)},")
                 line_data = []
         
         # print(f"{'-' * 80}")
@@ -455,7 +466,49 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
         print(f"总计: {insn_count} 条指令")
         print("=" * 80)
         return 1
-    
+
+    def export_insn_last_bytes(self):
+        """导出每条指令机器码的最后1字节"""
+        valid, start, end, _ = self.validate_address_range()
+        if not valid:
+            return 1
+        
+        print(f"\n[Data Exporter] 指令后1字节导出 (0x{start:08X} - 0x{end:08X}):")
+        print("=" * 80)
+        
+        ea = start
+        insn_count = 0
+        line_data = []
+        insn = insn_t()
+        byte_str_list = []
+        while ea <= end:
+            # 传入insn对象和ea地址进行指令解码
+            if not ida_ua.decode_insn(insn, ea):
+                print(f"[Data Exporter] 警告: 地址 0x{ea:08X} 无法解码为指令，跳过")
+                ea += 1
+                continue
+            
+            # 通过insn.size获取指令长度
+            insn_len = insn.size
+            insn_bytes = [ida_bytes.get_byte(ea + i) for i in range(insn_len)]
+            
+            # 取最后1字节
+            last_bytes = 0
+            start_idx = max(0, len(insn_bytes) - 1)
+            last_bytes = insn_bytes[start_idx:][0]
+            
+            byte_str_list.append(f"0x{last_bytes:02X}")
+            insn_count += 1
+            
+            # 移动到下一条指令
+            ea += insn_len
+        
+        print(f"{', '.join(byte_str_list)}",end='')
+        # print(f"{'-' * 80}")
+        print(f"\n总计: {insn_count} 条指令")
+        print("=" * 80)
+        return 1
+
     # 导出指令后8字节
     def export_insn_last_8bytes(self):
         """导出每条指令机器码的最后8字节（不足补0）"""
@@ -537,6 +590,9 @@ class DataExporterContextMenu(ida_kernwin.UI_Hooks):
             )
             ida_kernwin.attach_action_to_popup(
                 widget, popup, "data_exporter:export_hex", submenu, ida_kernwin.SETMENU_APP
+            )
+            ida_kernwin.attach_action_to_popup(
+                widget, popup, "data_exporter:export_insn_last1", submenu, ida_kernwin.SETMENU_APP
             )
             ida_kernwin.attach_action_to_popup(
                 widget, popup, "data_exporter:export_insn_last4", submenu, ida_kernwin.SETMENU_APP
@@ -621,6 +677,17 @@ class ExportHexAction(ida_kernwin.action_handler_t):
     
     def activate(self, ctx):
         return self.plugin.export_as_hex_string()
+    
+    def update(self, ctx):
+        return ida_kernwin.AST_ENABLE_ALWAYS
+
+class ExportInsnLastBytesAction(ida_kernwin.action_handler_t):
+    def __init__(self, plugin):
+        super().__init__()
+        self.plugin = plugin
+    
+    def activate(self, ctx):
+        return self.plugin.export_insn_last_bytes()
     
     def update(self, ctx):
         return ida_kernwin.AST_ENABLE_ALWAYS
