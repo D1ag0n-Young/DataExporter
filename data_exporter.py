@@ -108,7 +108,18 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
             0
         )
         reg_action(action_desc)
-        
+
+        # 导出数据 - 八字节（取消快捷键）
+        action_desc = ida_kernwin.action_desc_t(
+            "data_exporter:export_qwords",
+            "导出为八字节格式",
+            ExportDwordsAction(self),
+            None,
+            "导出为八字节格式",
+            0
+        )
+        reg_action(action_desc) 
+
         # 导出数据 - 十六进制字符串（取消快捷键）
         action_desc = ida_kernwin.action_desc_t(
             "data_exporter:export_hex",
@@ -356,7 +367,56 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
         print(f"总计: {dword_count} 个双字 ({dword_count * 4} 字节)")
         print("=" * 80)
         return 1
-    
+
+    def export_as_qwords(self):
+        """导出为八字节（四字）格式"""
+        valid, start, end, size = self.validate_address_range()
+        if not valid:
+            return 1
+        
+        # 确保地址对齐到4字节边界
+        if start % 8 != 0:
+            print(f"[Data Exporter] 警告: 起始地址 0x{start:08X} 未对齐到双字边界，已自动对齐")
+            start = start + (8 - (start % 8))
+        
+        dword_count = (end - start + 1) // 8
+        if dword_count <= 0:
+            print("[Data Exporter] 错误: 地址范围太小，无法导出四字数据")
+            return 1
+        
+        print(f"\n[Data Exporter] 八字节格式导出 (0x{start:08X} - 0x{end:08X}):")
+        print("=" * 80)
+        
+        line_data = []
+        for i in range(dword_count):
+            ea = start + i * 8
+            if ea + 3 > end:
+                break
+                
+            # 读取八个字节并组合成四字（小端序）
+            byte1 = ida_bytes.get_byte(ea)
+            byte2 = ida_bytes.get_byte(ea + 1)
+            byte3 = ida_bytes.get_byte(ea + 2)
+            byte4 = ida_bytes.get_byte(ea + 3)
+            byte5 = ida_bytes.get_byte(ea + 4)
+            byte6 = ida_bytes.get_byte(ea + 5)
+            byte7 = ida_bytes.get_byte(ea + 6)
+            byte8 = ida_bytes.get_byte(ea + 7)
+            dword_val = (byte8 << 56) | (byte7 << 48) | (byte6 << 40) | (byte5 << 32) | (byte4 << 24) | (byte3 << 16) | (byte2 << 8) | byte1
+            line_data.append(f"0x{dword_val:08X}")
+            
+            # 每4个四字输出一行
+            if len(line_data) == 4 or i == dword_count - 1:
+                addr = ea - len(line_data) * 8 + 8
+                # print(f"0x{addr:08X}: {', '.join(line_data)}")
+                print(f"{', '.join(line_data)},")
+                line_data = []
+        
+        # print(f"{'-' * 80}")
+        print(f"总计: {dword_count} 个四字 ({dword_count * 8} 字节)")
+        print("=" * 80)
+        return 1
+
     def export_as_hex_string(self):
         """导出为十六进制字符串"""
         valid, start, end, size = self.validate_address_range()
@@ -589,6 +649,9 @@ class DataExporterContextMenu(ida_kernwin.UI_Hooks):
                 widget, popup, "data_exporter:export_dwords", submenu, ida_kernwin.SETMENU_APP
             )
             ida_kernwin.attach_action_to_popup(
+                widget, popup, "data_exporter:export_qwords", submenu, ida_kernwin.SETMENU_APP
+            )
+            ida_kernwin.attach_action_to_popup(
                 widget, popup, "data_exporter:export_hex", submenu, ida_kernwin.SETMENU_APP
             )
             ida_kernwin.attach_action_to_popup(
@@ -666,6 +729,17 @@ class ExportDwordsAction(ida_kernwin.action_handler_t):
     
     def activate(self, ctx):
         return self.plugin.export_as_dwords()
+    
+    def update(self, ctx):
+        return ida_kernwin.AST_ENABLE_ALWAYS
+
+class ExportDwordsAction(ida_kernwin.action_handler_t):
+    def __init__(self, plugin):
+        super().__init__()
+        self.plugin = plugin
+    
+    def activate(self, ctx):
+        return self.plugin.export_as_qwords()
     
     def update(self, ctx):
         return ida_kernwin.AST_ENABLE_ALWAYS
