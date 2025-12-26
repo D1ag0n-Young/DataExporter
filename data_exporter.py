@@ -113,7 +113,7 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
         action_desc = ida_kernwin.action_desc_t(
             "data_exporter:export_qwords",
             "导出为八字节格式",
-            ExportDwordsAction(self),
+            ExportQwordsAction(self),
             None,
             "导出为八字节格式",
             0
@@ -287,9 +287,9 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
             return 1
         
         # 确保地址对齐到2字节边界
-        if start % 2 != 0:
-            print(f"[Data Exporter] 警告: 起始地址 0x{start:08X} 未对齐到字边界，已自动对齐")
-            start = start + 1
+        # if start % 2 != 0:
+        #     print(f"[Data Exporter] 警告: 起始地址 0x{start:08X} 未对齐到字边界，已自动对齐")
+        #     start = start + 1
         
         word_count = (end - start + 1) // 2
         if word_count <= 0:
@@ -330,9 +330,9 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
             return 1
         
         # 确保地址对齐到4字节边界
-        if start % 4 != 0:
-            print(f"[Data Exporter] 警告: 起始地址 0x{start:08X} 未对齐到双字边界，已自动对齐")
-            start = start + (4 - (start % 4))
+        # if start % 4 != 0:
+        #     print(f"[Data Exporter] 警告: 起始地址 0x{start:08X} 未对齐到双字边界，已自动对齐")
+        #     start = start + (4 - (start % 4))
         
         dword_count = (end - start + 1) // 4
         if dword_count <= 0:
@@ -375,9 +375,9 @@ class DataExporterPlugin(ida_idaapi.plugin_t):
             return 1
         
         # 确保地址对齐到4字节边界
-        if start % 8 != 0:
-            print(f"[Data Exporter] 警告: 起始地址 0x{start:08X} 未对齐到双字边界，已自动对齐")
-            start = start + (8 - (start % 8))
+        # if start % 8 != 0:
+        #     print(f"[Data Exporter] 警告: 起始地址 0x{start:08X} 未对齐到四字边界，已自动对齐")
+        #     start = start + (8 - (start % 8))
         
         dword_count = (end - start + 1) // 8
         if dword_count <= 0:
@@ -733,7 +733,7 @@ class ExportDwordsAction(ida_kernwin.action_handler_t):
     def update(self, ctx):
         return ida_kernwin.AST_ENABLE_ALWAYS
 
-class ExportDwordsAction(ida_kernwin.action_handler_t):
+class ExportQwordsAction(ida_kernwin.action_handler_t):
     def __init__(self, plugin):
         super().__init__()
         self.plugin = plugin
